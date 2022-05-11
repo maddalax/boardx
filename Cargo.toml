@@ -20,8 +20,16 @@ crate-type = ["cdylib", "rlib"]
 egui = "0.18.0"
 egui_extras = {version = "0.18.0", features = ["image"]}
 image = { version = "0.24.2", default-features = false, features = ["jpeg", "png"] }
-eframe = { version = "0.18.0", features = ["persistence"] }
-serde = { version = "1", features = ["derive"] } # You only need this if you want app persistence
+eframe = { version = "0.18.0" }
+rand = "0.8.5"
+
+[dependencies.uuid]
+version = "1.0.0"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
