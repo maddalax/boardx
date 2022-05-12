@@ -1,8 +1,9 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::fs;
+use std::{fs, thread};
 use std::fs::File;
 use std::io::Read;
+use std::time::Duration;
 use uuid::Uuid;
 
 use eframe::emath::{Align2, Vec2};
@@ -10,53 +11,48 @@ use eframe::epaint::{Color32, Rgba};
 
 use egui_extras::RetainedImage;
 
-use egui::{Id, LayerId, Order, TextStyle, Visuals, Widget, DroppedFile, ColorImage, Rect, Pos2, FontId, Layout, Sense, Direction, PointerState};
-use rand::Rng;
+use egui::{Id, LayerId, Order, TextStyle, Visuals, Widget, DroppedFile, ColorImage, Rect, Pos2, FontId, Layout, Sense, Direction, PointerState, Key};
+use rand::{random, Rng, RngCore};
 use crate::demo::{Block, BlockPosition, BlockType};
+use crate::state::BoardState;
+use crate::view::ViewState;
 
 pub struct App {
     // Example stuff:
-    label: String,
 
-    value: f32,
+    // image: Option<Result<RetainedImage, String>>,
 
-    image: Option<Result<RetainedImage, String>>,
+    block_state: BoardState,
 
-    screen: Vec2,
+    view_state: ViewState,
 
     dragging_widget: String,
 
     selected_widget: String,
 
-    positions: HashMap<String, BlockPosition>,
+    rendered_blocks: i32,
 
-    blocks: HashMap<String, Block>,
+    total_blocks: i32,
 
-    ids: Vec<String>
+    pixels_per_point: f32,
+
+    last_pixels_per_point: f32,
 }
 
 impl Default for App {
     fn default() -> Self {
-
-        let mut positions = HashMap::new();
-        let mut blocks = HashMap::new();
-        let mut ids = Vec::new();
-
         Self {
-            // Example stuff:
-            label: "Hello World!".to_owned(),
-            value: 2.7,
-            image: None,
-            screen: Vec2::new(0.00, 0.00),
             dragging_widget: String::from(""),
             selected_widget: String::from(""),
-            positions,
-            blocks,
-            ids,
+            block_state: BoardState::default(),
+            view_state: ViewState::default(),
+            rendered_blocks: 0,
+            total_blocks: 0,
+            pixels_per_point: 0.0,
+            last_pixels_per_point: 0.0,
         }
     }
 }
-
 
 impl App {
     /// Called once before the first frame.
@@ -72,8 +68,8 @@ impl App {
     pub fn get_interact_point(&self, state: &PointerState) -> Pos2 {
         let interact_point = state.interact_pos();
         if interact_point.is_some() {
-            let x = interact_point.unwrap().x + self.screen.x;
-            let y = interact_point.unwrap().y + self.screen.y;
+            let x = interact_point.unwrap().x + self.view_state.screen.x;
+            let y = interact_point.unwrap().y + self.view_state.screen.y;
             return Pos2::new(x, y)
         }
         return Pos2::default()
@@ -81,13 +77,13 @@ impl App {
 
     pub fn add_label(&mut self, x: f32, y: f32) {
         let id = Uuid::new_v4().to_string();
-        self.ids.push(id.clone());
-        self.blocks.insert(id.clone(), Block{
+        self.block_state.ids.push(id.clone());
+        self.block_state.blocks.insert(id.clone(), Block{
             id: Uuid::new_v4().to_string(),
             block_type: BlockType::Label,
             block_data: String::from("Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum."),
         });
-        self.positions.insert(id.clone(), BlockPosition {
+        self.block_state.positions.insert(id.clone(), BlockPosition {
             id: id.clone(),
             x,
             y,
@@ -104,7 +100,55 @@ impl eframe::App for App {
 
         ctx.set_debug_on_hover(true);
 
+        if self.pixels_per_point <= 0.00 {
+            self.pixels_per_point = ctx.pixels_per_point();
+        }
+
+        if self.pixels_per_point > 5.00 {
+            self.pixels_per_point = 5.00;
+        }
+
+        if self.last_pixels_per_point != self.pixels_per_point {
+            self.last_pixels_per_point = self.pixels_per_point;
+        }
+
+        if ctx.input().key_down(Key::ArrowDown) {
+            self.pixels_per_point -= 0.05;
+        }
+
+        if ctx.input().key_down(Key::ArrowUp) {
+            self.pixels_per_point += 0.05;
+
+        }
+
+        // let mut scroll_delta =  ctx.input().scroll_delta.y;
+        //
+        // if scroll_delta > 500.00 {
+        //     scroll_delta = 500.00
+        // }
+        //
+        // if scroll_delta < -500.00 {
+        //     scroll_delta = -500.00
+        // }
+        //
+        // let normalized = (scroll_delta * 10.00) / 500.00;
+        //
+        // if scroll_delta != 0.00 {
+        //     println!("Delta Y: {}, {}", scroll_delta, normalized);
+        // }
+
+        // self.pixels_per_point += normalized;
+
+        // if scroll_delta > 200.00 {
+        //     self.pixels_per_point += 1.00;
+        // }
+        //
+        // if scroll_delta < -200.00 {
+        //     self.pixels_per_point -= 1.00;
+        // }
+
         let screen_size = ctx.input().screen_rect().size();
+        self.view_state.viewport = screen_size + self.view_state.screen;
 
         let pointer = ctx.input().pointer.clone();
 
@@ -117,8 +161,8 @@ impl eframe::App for App {
             let x = interact_point.x;
             let y = interact_point.y;
 
-            for id in &self.ids {
-                let block_position = self.positions.get(id).unwrap();
+            for id in &self.block_state.ids {
+                let block_position = self.block_state.positions.get(id).unwrap();
                 let widget_size = block_position.size;
                 if x >= block_position.x && x <= block_position.x + widget_size.x && y >= block_position.y && y <= block_position.y + widget_size.y {
                     self.dragging_widget = block_position.id.clone();
@@ -130,12 +174,12 @@ impl eframe::App for App {
 
         if pointer.any_down() && pointer.is_moving() {
             if self.dragging_widget != "" {
-                let position = self.positions.get_mut(&self.dragging_widget).unwrap();
+                let position = self.block_state.positions.get_mut(&self.dragging_widget).unwrap();
                 position.x += pointer.delta().x;
                 position.y += pointer.delta().y
             } else {
-                self.screen.x -= pointer.delta().x;
-                self.screen.y -= pointer.delta().y;
+                self.view_state.screen.x -= pointer.delta().x;
+                self.view_state.screen.y -= pointer.delta().y;
             }
         }
 
@@ -143,11 +187,6 @@ impl eframe::App for App {
             let interact_point = self.get_interact_point(&pointer);
             self.add_label(interact_point.x, interact_point.y);
         }
-
-        // Examples of how to create different panels and windows.
-        // Pick whichever suits you.
-        // Tip: a good default choice is to just keep the `CentralPanel`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
@@ -164,36 +203,49 @@ impl eframe::App for App {
 
             ui.heading("Side Panel");
 
+            ui.add(egui::Slider::new(&mut self.pixels_per_point, 0.0..=10.00).text("Pixels Per Point"));
 
             if self.selected_widget != "" {
 
-                let block_position = self.positions.get_mut(&self.selected_widget).unwrap();
+                let block_position = self.block_state.positions.get_mut(&self.selected_widget).unwrap();
 
                 ui.add(egui::Slider::new(&mut block_position.size.x, 0.0..=1000.00).text("Selected Widget Width"));
                 ui.add(egui::Slider::new(&mut block_position.size.y, 0.0..=1000.00).text("Selected Widget Height"));
             }
 
-            ui.label(format!("Screen Offset: {}, {}", self.screen.x, self.screen.y));
+            ui.label(format!("Screen Offset: {}, {}", self.view_state.screen.x, self.view_state.screen.y));
             ui.label(format!("Screen Size: {}, {}", screen_size.x, screen_size.y));
-
-            let area = screen_size + self.screen;
 
             let clip_rect = ui.clip_rect();
 
-            ui.label(format!("Area: {}, {}", area.x, area.y));
+            ui.label(format!("Area: {} - {}, {} - {}", self.view_state.screen.x, self.view_state.viewport.x, self.view_state.screen.y, self.view_state.viewport.y));
 
             ui.label(format!("Dragging Widget: {}", self.dragging_widget));
 
-            ui.label(format!("Clip Rect: {}, {}", clip_rect.size().x, clip_rect.size().y))
+            ui.label(format!("Clip Rect: {}, {}", clip_rect.size().x, clip_rect.size().y));
+
+            ui.label(format!("Rendered Blocks: {}", self.rendered_blocks));
+            ui.label(format!("Total Blocks: {}", self.total_blocks));
+
 
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
 
-            for id in &self.ids {
-                let mut block_position = self.positions.get_mut(id).unwrap();
-                let position = Pos2::new(block_position.x - self.screen.x, block_position.y - self.screen.y);
-                let block = self.blocks.get(&block_position.id).unwrap();
+            self.rendered_blocks = 0;
+            self.total_blocks = 0;
+            for id in &self.block_state.ids {
+                self.total_blocks += 1;
+                let mut block_position = self.block_state.positions.get_mut(id).unwrap();
+                if !self.view_state.in_viewport(block_position.x, block_position.y) {
+                    continue;
+                }
+
+                self.rendered_blocks += 1;
+
+                let position = Pos2::new(block_position.x - self.view_state.screen.x, block_position.y - self.view_state.screen.y);
+
+                let block = self.block_state.blocks.get(&block_position.id).unwrap();
                 let data = &block.block_data;
                 match block.block_type {
                     BlockType::Button => {
@@ -201,7 +253,6 @@ impl eframe::App for App {
                     },
                     BlockType::Label => {
                         let old_clip_rect = ui.clip_rect();
-                        // let old_cursor = ui.cursor();
                         ui.set_clip_rect(Rect::NOTHING);
 
                         let r = egui::Label::new(data).wrap(true).ui(ui);
@@ -211,13 +262,9 @@ impl eframe::App for App {
                         // Clamp to max 300 width by default
                         if block_position.size.x == 0.00 {
                             if rect.width() > 300.00 {
-                                block_position.size.x = 300.00;
-                            } else {
-                                block_position.size.x = rect.width();
+                                rect.set_width(300.00);
                             }
-                        }
-
-                        if block_position.size.x <= rect.width() {
+                        } else {
                             rect.set_width(block_position.size.x);
                         }
 
@@ -228,7 +275,6 @@ impl eframe::App for App {
                         block_position.size = size;
 
                         ui.set_clip_rect(old_clip_rect);
-                        ui.set_max_width(300.00);
 
                         let r2 = ui.put(widget_rect, egui::Label::new(data).wrap(true));
                         block_position.size = r2.rect.size();

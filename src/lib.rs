@@ -2,6 +2,9 @@
 
 mod app;
 mod demo;
+mod persistor;
+mod state;
+mod view;
 
 pub use app::App;
 
