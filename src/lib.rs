@@ -5,6 +5,7 @@ mod demo;
 mod persistor;
 mod state;
 mod view;
+mod test;
 
 pub use app::App;
 

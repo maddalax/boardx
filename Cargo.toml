@@ -22,6 +22,7 @@ egui_extras = {version = "0.18.0", features = ["image"]}
 image = { version = "0.24.2", default-features = false, features = ["jpeg", "png"] }
 eframe = { version = "0.18.0" }
 rand = "0.8.5"
+rusqlite = { version = "0.27.0", features = ["bundled"] }
 
 [dependencies.uuid]
 version = "1.0.0"
