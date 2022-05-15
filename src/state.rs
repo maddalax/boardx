@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use egui::Vec2;
+use egui::{Vec2, Widget};
 use crate::demo::{Block, BlockPosition};
 
 pub struct BoardState {

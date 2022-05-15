@@ -21,8 +21,8 @@ impl ViewState {
         let buffer = 300.00;
         let y_min = self.offset.y - buffer;
         let y_max = self.viewport.y + buffer;
-        let x_min = self.offset.x;
-        let x_max = self.viewport.x + buffer - buffer;
+        let x_min = self.offset.x - buffer;
+        let x_max = self.viewport.x + buffer;
 
         if y > y_max || y < y_min || x > x_max || x < x_min {
             return false;

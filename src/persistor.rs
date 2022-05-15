@@ -39,14 +39,28 @@ impl Persistor {
 
     pub fn on_add(&mut self, block: SavedBlock) {
         let connection = Persistor::CONNECTION.with(|c| c.read().unwrap().clone());
-        let statement = connection
+        connection
             .execute("INSERT INTO blocks VALUES(?, ?, ?, ?, ?)", [
                 block.id,
                 block.block_type.to_string(),
                 block.block_data,
                 block.position.x.to_string(),
-                block.position.y.to_string()
-            ]).unwrap();
+                block.position.y.to_string()]).unwrap();
+    }
+
+    pub fn on_move(&mut self, id: &String, x: f32, y: f32) {
+        println!("block moved: {}, {}, {}", id, x, y);
+        let connection = Persistor::CONNECTION.with(|c| c.read().unwrap().clone());
+        connection
+            .execute("UPDATE blocks SET x = ?, y = ? WHERE id = ?", [
+                x.to_string(), y.to_string(), id.to_string()]).unwrap();
+    }
+
+    pub fn on_data_change(&mut self, id: &String, data: String) {
+        let connection = Persistor::CONNECTION.with(|c| c.read().unwrap().clone());
+        connection
+            .execute("UPDATE blocks SET data = ? WHERE id = ?", [
+                data, id.to_string()]).unwrap();
     }
 
     pub fn load(self, x_min: f32, x_max: f32, y_min: f32, y_max: f32) -> Vec<SavedBlock> {

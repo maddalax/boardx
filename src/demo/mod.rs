@@ -2,8 +2,6 @@ use std::fmt::{Display, Formatter};
 use egui::{Vec2, Widget};
 use rusqlite::types::{FromSql, FromSqlResult, ValueRef};
 
-pub mod text_edit;
-
 #[derive(Debug, Clone)]
 pub struct BlockPosition {
     pub(crate) id: String,
