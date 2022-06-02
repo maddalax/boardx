@@ -34,6 +34,13 @@ impl Persistor {
             .unwrap();
     }
 
+    pub fn on_size_change(&mut self, id: &String, size: Vec2) {
+        let connection = Persistor::CONNECTION.with(|c| c.read().unwrap().clone());
+        connection
+            .execute("UPDATE blocks SET width = ?, height = ? WHERE id = ?", [size.x.to_string(),
+                size.y.to_string(), id.to_string()]).unwrap();
+    }
+
     pub fn on_add(&mut self, block: SavedBlock) {
         let connection = Persistor::CONNECTION.with(|c| c.read().unwrap().clone());
         connection

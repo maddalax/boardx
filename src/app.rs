@@ -413,11 +413,11 @@ impl eframe::App for App {
                                     }
                                 };
 
-                                // if block_position.size != r2.rect.size() {
-                                //     block_position.size = r2.rect.size();
-                                //     println!("block size change: {}, {}", r2.rect.size().x, r2.rect.size().y);
-                                //     self.persist.on_size_change(id, r2.rect.size());
-                                // }
+                                if block_position.size != r2.rect.size() {
+                                    block_position.size = r2.rect.size();
+                                    println!("block size change: {}, {}", r2.rect.size().x, r2.rect.size().y);
+                                    self.persist.on_size_change(id, r2.rect.size());
+                                }
 
                                 if id == &self.selected_widget {
                                     ui.painter().rect_stroke(r2.rect, 4.0, (1.0, Color32::RED));
