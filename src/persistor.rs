@@ -6,8 +6,7 @@ use std::sync::{Arc, RwLock};
 use crate::demo::BlockType;
 use crate::state::BoardState;
 
-pub struct Persistor {
-}
+pub struct Persistor {}
 
 #[derive(Debug)]
 pub struct SavedBlock {
@@ -20,13 +19,11 @@ pub struct SavedBlock {
 
 impl Default for Persistor {
     fn default() -> Self {
-        return Self {
-        };
+        return Self {};
     }
 }
 
 impl Persistor {
-
     thread_local! {
         static CONNECTION: RwLock<Arc<Connection>> = RwLock::new(Arc::new(Connection::open("./boardx.db").unwrap()));
     }
@@ -40,12 +37,14 @@ impl Persistor {
     pub fn on_add(&mut self, block: SavedBlock) {
         let connection = Persistor::CONNECTION.with(|c| c.read().unwrap().clone());
         connection
-            .execute("INSERT INTO blocks VALUES(?, ?, ?, ?, ?)", [
+            .execute("INSERT INTO blocks VALUES(?, ?, ?, ?, ?, ?, ?)", [
                 block.id,
                 block.block_type.to_string(),
                 block.block_data,
                 block.position.x.to_string(),
-                block.position.y.to_string()]).unwrap();
+                block.position.y.to_string(),
+                block.size.x.to_string(),
+                block.size.y.to_string()]).unwrap();
     }
 
     pub fn on_move(&mut self, id: &String, x: f32, y: f32) {
@@ -65,18 +64,21 @@ impl Persistor {
 
     pub fn load(self, x_min: f32, x_max: f32, y_min: f32, y_max: f32) -> Vec<SavedBlock> {
         let connection = Persistor::CONNECTION.with(|c| c.read().unwrap().clone());
-        let mut stmt = connection
-            .prepare("SELECT id, type, data, x, y FROM blocks WHERE x >= ? and x <= ? and y >= ? and y <= ?").unwrap();
-        let block_iter = stmt.query_map(params![x_min.to_string(),
-                                                      x_max.to_string(),
-                                                      y_min.to_string(),
-                                                      y_max.to_string()], |row| {
+
+        let query = format!("SELECT id, type, data, x, y, height, width FROM blocks WHERE {} < x + width AND {} > x AND {} < y + height AND {} > y",
+                            x_min, x_max, y_min, y_max);
+
+        println!("{}", query);
+
+        let mut stmt = connection.prepare(&query).unwrap();
+
+        let block_iter = stmt.query_map([], |row| {
             Ok(SavedBlock {
-                size: Default::default(),
+                size: Vec2::new(row.get(5)?, row.get(6)?),
                 position: Pos2::new(row.get(3)?, row.get(4)?),
                 id: row.get(0)?,
                 block_type: row.get(1)?,
-                block_data: row.get(2)?
+                block_data: row.get(2)?,
             })
         }).unwrap();
 
@@ -87,7 +89,8 @@ impl Persistor {
             blocks.push(block.unwrap());
         }
 
-        return blocks;
+        println!("total blocks: {}", blocks.len());
 
+        return blocks;
     }
 }

@@ -48,15 +48,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "000444226fcff248f2bc4c7625be32c63caccfecc2723a2b9f78a7487a49c407"
 
 [[package]]
-name = "ansi_term"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "arboard"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -97,6 +88,21 @@ name = "block"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
+
+[[package]]
+name = "boardx"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "eframe",
+ "egui",
+ "egui_extras",
+ "image",
+ "rand",
+ "rusqlite",
+ "tracing-wasm",
+ "uuid",
+]
 
 [[package]]
 name = "bumpalo"
@@ -431,26 +437,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "eframe_template"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "eframe",
- "egui",
- "egui_extras",
- "image",
- "rand",
- "rusqlite",
- "tracing-subscriber",
- "tracing-wasm",
- "uuid",
-]
-
-[[package]]
 name = "egui"
-version = "0.18.0"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c4be5abc5b868ade7db0caf8e96f2c3ddccb243f7e93d382cf5d0e43f85ae86"
+checksum = "eb095a8b9feb9b7ff8f00b6776dffcef059538a3f4a91238e03c900e9c9ad9a2"
 dependencies = [
  "ahash",
  "epaint",
@@ -508,9 +498,9 @@ dependencies = [
 
 [[package]]
 name = "epaint"
-version = "0.18.0"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dfd8ef097bd349762fcf1c7a5ef2f0e686f9919253b7a298827d6ff9d401dee"
+checksum = "0c29567088888e8ac3e8f61bbb2ddc820207ebb8d69eefde5bcefa06d65e4e89"
 dependencies = [
  "ab_glyph",
  "ahash",
@@ -1531,28 +1521,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-log"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78ddad33d2d10b1ed7eb9d1f518a5674713876e97e5bb9b7345a7984fbb4f922"
-dependencies = [
- "lazy_static",
- "log",
- "tracing-core",
-]
-
-[[package]]
 name = "tracing-subscriber"
 version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4bc28f93baff38037f64e6f43d34cfa1605f27a49c34e8a04c5e78b0babf2596"
 dependencies = [
- "ansi_term",
  "sharded-slab",
- "smallvec",
  "thread_local",
  "tracing-core",
- "tracing-log",
 ]
 
 [[package]]

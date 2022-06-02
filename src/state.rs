@@ -6,6 +6,7 @@ pub struct BoardState {
     pub(crate) positions: HashMap<String, BlockPosition>,
     pub(crate) blocks: HashMap<String, Block>,
     pub(crate) ids: Vec<String>,
+    pub(crate) sizes: HashMap<String, Vec2>
 }
 
 impl Default for BoardState {
@@ -13,10 +14,12 @@ impl Default for BoardState {
         let positions = HashMap::new();
         let blocks = HashMap::new();
         let ids = Vec::new();
+        let sizes = HashMap::new();
         return Self {
             positions,
             blocks,
             ids,
+            sizes
         }
     }
 }

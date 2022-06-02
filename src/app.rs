@@ -14,7 +14,6 @@ use eframe::epaint::{Color32, Rgba};
 use egui::{ColorImage, Direction, DroppedFile, epaint, FontId, Id, Key, LayerId, Layout, MultiTouchInfo, Order, PointerState, Pos2, pos2, Rect, Sense, Shape, Style, TextStyle, Visuals, Widget};
 use egui::Key::{N, S};
 use rand::{random, Rng, RngCore};
-use rusqlite::Connection;
 use uuid::Uuid;
 
 use crate::demo::{Block, BlockPosition, BlockType};
@@ -24,8 +23,6 @@ use crate::view::ViewState;
 
 pub struct App {
     board_state: BoardState,
-
-    new_board_state: BoardState,
 
     view_state: ViewState,
 
@@ -64,7 +61,6 @@ impl Default for App {
             dragging_widget: String::from(""),
             selected_widget: String::from(""),
             hovered_widget: String::from(""),
-            new_board_state: BoardState::default(),
             board_state: BoardState::default(),
             view_state: ViewState::default(),
             persist: Persistor::default(),
@@ -82,13 +78,15 @@ impl Default for App {
     }
 }
 
+const BUFFER: f32 = 300.00;
+
 impl App {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customized the look at feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
-        cc.egui_ctx.set_visuals(Visuals::dark());
+        // cc.egui_ctx.set_visuals(Visuals::dark());
 
         let (view_state_sender, view_state_reciever): (Sender<ViewState>, Receiver<ViewState>) = channel();
 
@@ -136,6 +134,7 @@ impl App {
                             positions: positions,
                             blocks: blocks,
                             ids: ids,
+                            sizes: Default::default()
                         };
 
                         board_state_sender.send(board_state);
@@ -199,6 +198,13 @@ impl App {
             return;
         }
 
+        let diff = self.view_state.viewport - self.view_state.last_offset;
+
+        if diff.x >= -BUFFER && diff.x <= BUFFER && diff.y >= -BUFFER && diff.y <= BUFFER {
+            return
+        }
+
+        self.view_state.last_offset = self.view_state.viewport;
         self.last_viewport_change = Instant::now();
         self.view_state_sender.as_ref().unwrap().send(self.view_state);
     }
@@ -258,6 +264,14 @@ impl eframe::App for App {
             self.dragging_widget = String::from("")
         }
 
+        if ctx.input().key_down(Key::Space) {
+            let interact_point = self.get_interact_point(&pointer);
+            let x = interact_point.x;
+            let y = interact_point.y;
+            self.add_label(x, y);
+        }
+
+
         if self.dragging_widget == "" {
             let interact_point = self.get_interact_point(&pointer);
             let x = interact_point.x;
@@ -268,7 +282,7 @@ impl eframe::App for App {
                 let block_position = self.board_state.positions.get(id).unwrap();
                 let widget_size = block_position.size;
                 if x >= block_position.x && x <= block_position.x + widget_size.x && y >= block_position.y && y <= block_position.y + widget_size.y {
-                    if pointer.any_down() {
+                    if pointer.primary_down() {
                         self.dragging_widget = block_position.id.clone();
                         self.selected_widget = block_position.id.clone();
                     }
@@ -324,34 +338,32 @@ impl eframe::App for App {
 
             self.rendered_blocks = 0;
             self.total_blocks = 0;
+
+            let old_clip_rect = ui.clip_rect();
+            ui.set_clip_rect(Rect::NOTHING);
+
             for id in &self.board_state.ids {
-                self.total_blocks += 1;
+
+                if self.board_state.sizes.contains_key(id) {
+                    continue
+                }
+
                 let mut block_position = self.board_state.positions.get_mut(id).unwrap();
-
-                self.rendered_blocks += 1;
-
-                let position = Pos2::new(block_position.x - self.view_state.offset.x, block_position.y - self.view_state.offset.y);
-
                 let block = self.board_state.blocks.get_mut(&block_position.id).unwrap();
-
-                let original_data = block.block_data.clone();
-
                 match block.block_type {
-                    BlockType::Button => {
-                        // ui.put(widget_rect, egui::Button::new(data));
-                    }
+                    BlockType::Button => {}
                     BlockType::Label => {
-                        let old_clip_rect = ui.clip_rect();
-                        ui.set_clip_rect(Rect::NOTHING);
-
-
-                        let output = egui::TextEdit::multiline(&mut block.block_data)
-                            .hint_text("Type something!");
-
-                        let r = output.ui(ui);
+                        let r = match &self.selected_widget == id {
+                            true => {
+                                egui::TextEdit::multiline(&mut block.block_data)
+                                    .hint_text("Type something!").ui(ui)
+                            }
+                            false => {
+                                egui::Label::new(block.block_data.clone()).ui(ui)
+                            }
+                        };
 
                         let mut rect = r.rect;
-
                         // Clamp to max 300 width by default
                         if block_position.size.x == 0.00 {
                             if rect.width() > 300.00 {
@@ -363,30 +375,62 @@ impl eframe::App for App {
 
                         let size = rect.size();
 
-                        let widget_rect = Rect::from_min_size(position, size);
+                        self.board_state.sizes.insert(block.id.clone(), size);
+                    }
+                }
+            }
 
-                        block_position.size = size;
+            ui.set_clip_rect(old_clip_rect);
 
-                        ui.set_clip_rect(old_clip_rect);
+            for id in &self.board_state.ids {
+                self.total_blocks += 1;
+                let mut block_position = self.board_state.positions.get_mut(id).unwrap();
+                self.rendered_blocks += 1;
+                let position = Pos2::new(block_position.x - self.view_state.offset.x, block_position.y - self.view_state.offset.y);
+                let block = self.board_state.blocks.get_mut(&block_position.id).unwrap();
+                let original_data = block.block_data.clone();
 
-                        let output = egui::TextEdit::multiline(&mut block.block_data)
-                            .hint_text("Type something!");
+                match block.block_type {
+                    BlockType::Button => {
+                        // ui.put(widget_rect, egui::Button::new(data));
+                    }
+                    BlockType::Label => {
 
-                        let r2 = ui.put(widget_rect, output);
+                        match self.board_state.sizes.get(id) {
+                            None => {}
+                            Some(size) => {
+                                let widget_rect = Rect::from_min_size(position, *size);
 
-                        block_position.size = r2.rect.size();
+                                ui.set_clip_rect(old_clip_rect);
 
-                        if id == &self.selected_widget {
-                            ui.painter().rect_stroke(r2.rect, 4.0, (1.0, Color32::RED));
+                                let r2 = match &self.selected_widget == id {
+                                    true => {
+                                        ui.put(widget_rect, egui::TextEdit::multiline(&mut block.block_data)
+                                            .hint_text("Type something!"))
+                                    }
+                                    false => {
+                                        ui.put(widget_rect, egui::Label::new(block.block_data.clone()).wrap(true))
+                                    }
+                                };
 
-                            if original_data != block.block_data {
-                                self.persist.on_data_change(id, block.block_data.clone());
+                                // if block_position.size != r2.rect.size() {
+                                //     block_position.size = r2.rect.size();
+                                //     println!("block size change: {}, {}", r2.rect.size().x, r2.rect.size().y);
+                                //     self.persist.on_size_change(id, r2.rect.size());
+                                // }
+
+                                if id == &self.selected_widget {
+                                    ui.painter().rect_stroke(r2.rect, 4.0, (1.0, Color32::RED));
+
+                                    if original_data != block.block_data {
+                                        self.persist.on_data_change(id, block.block_data.clone());
+                                    }
+                                }
+
+                                else if id == &self.hovered_widget {
+                                    ui.painter().rect_stroke(r2.rect, 4.0, (1.0, Color32::LIGHT_BLUE));
+                                }
                             }
-
-                        }
-
-                        else if id == &self.hovered_widget {
-                            ui.painter().rect_stroke(r2.rect, 4.0, (1.0, Color32::LIGHT_BLUE));
                         }
                     }
                 }
@@ -406,6 +450,7 @@ impl eframe::App for App {
 
         if self.debug_mode {
             egui::SidePanel::left("side_panel").show(ctx, |ui| {
+
                 ui.heading("Side Panel");
 
                 ui.add(egui::Slider::new(&mut self.pixels_per_point, 0.0..=10.00).text("Pixels Per Point"));

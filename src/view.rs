@@ -1,16 +1,19 @@
+use std::collections::HashMap;
 use egui::Vec2;
 
 #[derive(Clone, Copy)]
 pub struct ViewState {
     pub(crate) viewport: Vec2,
     pub(crate) offset: Vec2,
+    pub(crate) last_offset: Vec2,
 }
 
 impl Default for ViewState {
     fn default() -> Self {
         return Self {
             viewport: Vec2::ZERO,
-            offset: Vec2::ZERO
+            offset: Vec2::ZERO,
+            last_offset: Vec2::ZERO,
         }
     }
 }
